@@ -1,7 +1,10 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
-import { Github, Linkedin, Mail, MapPin, Loader2, Check } from "lucide-react";
+import { Github, MapPin, Loader2, Check } from "lucide-react";
+
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/xyekdvyn";
 
 const FIELD_BASE =
   "w-full bg-transparent border-b border-line py-3 text-[15px] text-ink placeholder:text-ink-soft/60 focus:outline-none focus:border-ink transition-colors duration-200";
@@ -11,22 +14,39 @@ export default function Contact() {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting, },
+    formState: { errors, isSubmitting },
   } = useForm({ mode: "onBlur" });
 
-  const [sent, setSent] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState("idle");
 
-  const onSubmit = async () => {
-    // Simulated submission — wire this to your backend or a form service.
-    await new Promise((r) => setTimeout(r, 1200));
-    setSent(true);
-    reset();
-    setTimeout(() => setSent(false), 3500);
+  const onSubmit = async (data) => {
+    setSubmitStatus("idle");
+
+    try {
+      const response = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        setSubmitStatus("error");
+        return;
+      }
+
+      setSubmitStatus("success");
+      reset();
+    } catch {
+      setSubmitStatus("error");
+    }
   };
 
   return (
     <section id="contact" className="py-24 md:py-32 border-t border-line">
-      <div className="mx-auto max-w-350 px-6 md:px-10">
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -34,26 +54,37 @@ export default function Contact() {
           transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
           className="mb-14"
         >
-          <p className="font-mono text-[13px] text-accent mb-3">04 · Contact</p>
+          <p className="font-mono text-[13px] text-accent mb-3">
+            04 · Contact
+          </p>
           <h2 className="font-display text-3xl md:text-[40px] font-semibold tracking-tight text-ink">
             Let's build something.
           </h2>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-16">
+        <div className="flex flex-col gap-14">
+          {/* Contact form */}
           <motion.form
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 1, 0.5, 1] }}
+            transition={{
+              duration: 0.5,
+              delay: 0.1,
+              ease: [0.25, 1, 0.5, 1],
+            }}
             onSubmit={handleSubmit(onSubmit)}
-            className="md:col-span-7 space-y-7"
+            className="max-w-3xl space-y-7"
             noValidate
           >
             <div>
               <input
-                {...register("name", { required: "Your name is required." })}
+                {...register("name", {
+                  required: "Your name is required.",
+                })}
                 placeholder="Name"
+                aria-label="Name"
+                autoComplete="name"
                 className={FIELD_BASE}
               />
               <FieldError message={errors.name?.message} />
@@ -68,7 +99,10 @@ export default function Contact() {
                     message: "Enter a valid email address.",
                   },
                 })}
+                type="email"
                 placeholder="Email"
+                aria-label="Email"
+                autoComplete="email"
                 className={FIELD_BASE}
               />
               <FieldError message={errors.email?.message} />
@@ -76,8 +110,11 @@ export default function Contact() {
 
             <div>
               <input
-                {...register("project", { required: "Give this a short title." })}
+                {...register("project", {
+                  required: "Give this a short title.",
+                })}
                 placeholder="Project"
+                aria-label="Project"
                 className={FIELD_BASE}
               />
               <FieldError message={errors.project?.message} />
@@ -87,9 +124,13 @@ export default function Contact() {
               <textarea
                 {...register("message", {
                   required: "Tell me a bit about it.",
-                  minLength: { value: 10, message: "A little more detail helps." },
+                  minLength: {
+                    value: 10,
+                    message: "A little more detail helps.",
+                  },
                 })}
                 placeholder="Message"
+                aria-label="Message"
                 rows={4}
                 className={`${FIELD_BASE} resize-none`}
               />
@@ -110,12 +151,16 @@ export default function Contact() {
                     exit={{ opacity: 0 }}
                     className="flex items-center gap-2"
                   >
-                    <Loader2 size={15} className="animate-spin" strokeWidth={1.5} />
+                    <Loader2
+                      size={15}
+                      className="animate-spin"
+                      strokeWidth={1.5}
+                    />
                     Sending
                   </motion.span>
-                ) : sent ? (
+                ) : submitStatus === "success" ? (
                   <motion.span
-                    key="sent"
+                    key="success"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -125,32 +170,77 @@ export default function Contact() {
                     Sent
                   </motion.span>
                 ) : (
-                  <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <motion.span
+                    key="idle"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
                     Send Message
                   </motion.span>
                 )}
               </AnimatePresence>
             </button>
+
+            {submitStatus === "success" && (
+              <p role="status" className="text-[13px] text-green-700">
+                Message sent successfully. Thanks for reaching out.
+              </p>
+            )}
+
+            {submitStatus === "error" && (
+              <p role="alert" className="text-[13px] text-red-600">
+                The message couldn't be sent. Please try again in a moment.
+              </p>
+            )}
           </motion.form>
 
+          {/* GitHub and location below the form */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.5, delay: 0.15, ease: [0.25, 1, 0.5, 1] }}
-            className="md:col-span-5 space-y-6"
+            transition={{
+              duration: 0.5,
+              delay: 0.15,
+              ease: [0.25, 1, 0.5, 1],
+            }}
+            className="max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-2"
           >
-            <InfoRow icon={Github} label="GitHub" value="github.com/exequielcalix" href="https://github.com/exequielcalix" />
-            <InfoRow icon={Linkedin} label="LinkedIn" value="linkedin.com/in/exequielcalix" href="https://linkedin.com/in/exequielcalix" />
-            <InfoRow icon={Mail} label="Email" value="hello@exequielcalix.dev" href="mailto:hello@exequielcalix.dev" />
-            <InfoRow icon={MapPin} label="Location" value="Remote · Open to relocation" />
+            <InfoRow
+              icon={Github}
+              label="GitHub"
+              value="github.com/Exequiel-0"
+              href="https://github.com/Exequiel-0"
+            />
 
-            <div className="pt-6 border-t border-line flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-              <span className="text-[13px] text-ink-soft">Available for freelance work.</span>
-            </div>
+            <InfoRow
+              icon={MapPin}
+              label="Location"
+              value="Remote · Open to relocation"
+            />
           </motion.div>
         </div>
+
+        {/* Availability indicator below everything */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{
+            duration: 0.45,
+            delay: 0.1,
+            ease: [0.25, 1, 0.5, 1],
+          }}
+          className="mt-14 md:mt-16 flex justify-center"
+        >
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
+            <span className="text-[13px] text-ink-soft">
+              Available for freelance work.
+            </span>
+          </div>
+        </motion.div>
       </div>
     </section>
   );
@@ -178,13 +268,18 @@ function InfoRow({ icon: Icon, label, value, href }) {
   const content = (
     <div className="flex items-center gap-4 py-3 border-b border-line group">
       <Icon size={16} strokeWidth={1.5} className="text-ink-soft" />
+
       <div>
-        <div className="font-mono text-[10px] text-ink-soft uppercase tracking-wide">{label}</div>
+        <div className="font-mono text-[10px] text-ink-soft uppercase tracking-wide">
+          {label}
+        </div>
+
         <div className="text-[14px] text-ink group-hover:text-accent transition-colors duration-200">
           {value}
         </div>
       </div>
     </div>
   );
+
   return href ? <a href={href}>{content}</a> : content;
 }
